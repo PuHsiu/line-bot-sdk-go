@@ -44,6 +44,8 @@ func main() {
 	http.HandleFunc("/downloaded/", http.StripPrefix("/downloaded/", downloadedFileServer).ServeHTTP)
 
 	http.HandleFunc("/callback", app.Callback)
+	// This is just a sample code.
+	// For actually use, you must support HTTPS by using `ListenAndServeTLS`, reverse proxy or etc.
 	if err := http.ListenAndServe(":"+os.Getenv("PORT"), nil); err != nil {
 		log.Fatal(err)
 	}
@@ -138,7 +140,7 @@ func (app *KitchenSink) Callback(w http.ResponseWriter, r *http.Request) {
 				log.Print(err)
 			}
 		case linebot.EventTypeLeave:
-			log.Printf("Leaved: %v", event)
+			log.Printf("Left: %v", event)
 		case linebot.EventTypePostback:
 			if err := app.replyText(event.ReplyToken, "Got postback: "+event.Postback.Data); err != nil {
 				log.Print(err)
