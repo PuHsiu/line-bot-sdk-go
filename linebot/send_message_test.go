@@ -121,6 +121,28 @@ func TestPushMessages(t *testing.T) {
 			},
 		},
 		{
+			// A buttons template message with datetimepicker action
+			Messages: []Message{
+				NewTemplateMessage(
+					"this is a buttons template",
+					NewButtonsTemplate(
+						"https://example.com/bot/images/image.jpg",
+						"Menu",
+						"Please select a date, time or datetime",
+						NewDatetimePickerTemplateAction("Date", "action=sel&only=date", "date", "2017-09-01", "2017-09-03", ""),
+						NewDatetimePickerTemplateAction("Time", "action=sel&only=time", "time", "", "23:59", "00:00"),
+						NewDatetimePickerTemplateAction("DateTime", "action=sel", "datetime", "2017-09-01T12:00", "", ""),
+					),
+				),
+			},
+			ResponseCode: 200,
+			Response:     []byte(`{}`),
+			Want: want{
+				RequestBody: []byte(`{"to":"U0cc15697597f61dd8b01cea8b027050e","messages":[{"type":"template","altText":"this is a buttons template","template":{"type":"buttons","thumbnailImageUrl":"https://example.com/bot/images/image.jpg","title":"Menu","text":"Please select a date, time or datetime","actions":[{"type":"datetimepicker","label":"Date","data":"action=sel\u0026only=date","mode":"date","initial":"2017-09-01","max":"2017-09-03"},{"type":"datetimepicker","label":"Time","data":"action=sel\u0026only=time","mode":"time","max":"23:59","min":"00:00"},{"type":"datetimepicker","label":"DateTime","data":"action=sel","mode":"datetime","initial":"2017-09-01T12:00"}]}}]}` + "\n"),
+				Response:    &BasicResponse{},
+			},
+		},
+		{
 			// A buttons template message without thumbnailImageURL
 			Messages: []Message{
 				NewTemplateMessage(
@@ -226,6 +248,26 @@ func TestPushMessages(t *testing.T) {
 			Response:     []byte(`{}`),
 			Want: want{
 				RequestBody: []byte(`{"to":"U0cc15697597f61dd8b01cea8b027050e","messages":[{"type":"template","altText":"this is a carousel template","template":{"type":"carousel","columns":[{"thumbnailImageUrl":"https://example.com/bot/images/item1.jpg","title":"this is menu","text":"description","actions":[{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=111"},{"type":"postback","label":"Add to cart","data":"action=add\u0026itemid=111"},{"type":"uri","label":"View detail","uri":"http://example.com/page/111"}]}]}}]}` + "\n"),
+				Response:    &BasicResponse{},
+			},
+		},
+		{
+			// A imagecarousel template message
+			Messages: []Message{
+				NewTemplateMessage(
+					"this is a image carousel template",
+					NewImageCarouselTemplate(
+						NewImageCarouselColumn(
+							"https://example.com/bot/images/item1.jpg",
+							NewURITemplateAction("View detail", "http://example.com/page/111"),
+						),
+					),
+				),
+			},
+			ResponseCode: 200,
+			Response:     []byte(`{}`),
+			Want: want{
+				RequestBody: []byte(`{"to":"U0cc15697597f61dd8b01cea8b027050e","messages":[{"type":"template","altText":"this is a image carousel template","template":{"type":"image_carousel","columns":[{"imageUrl":"https://example.com/bot/images/item1.jpg","action":{"type":"uri","label":"View detail","uri":"http://example.com/page/111"}}]}}]}` + "\n"),
 				Response:    &BasicResponse{},
 			},
 		},
