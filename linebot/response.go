@@ -39,8 +39,14 @@ type ErrorResponse struct {
 type UserProfileResponse struct {
 	UserID        string `json:"userId"`
 	DisplayName   string `json:"displayName"`
-	PicutureURL   string `json:"pictureUrl"`
+	PictureURL    string `json:"pictureUrl"`
 	StatusMessage string `json:"statusMessage"`
+}
+
+// MemberIDsResponse type
+type MemberIDsResponse struct {
+	MemberIDs []string `json:"memberIds"`
+	Next      string   `json:"next"`
 }
 
 // MessageContentResponse type
@@ -89,6 +95,18 @@ func decodeToUserProfileResponse(res *http.Response) (*UserProfileResponse, erro
 		return nil, err
 	}
 	return &result, nil
+}
+
+func decodeToMemberIDsResponse(res *http.Response) (*MemberIDsResponse, error) {
+	if err := checkResponse(res); err != nil {
+		return nil, err
+	}
+	decoder := json.NewDecoder(res.Body)
+	result := &MemberIDsResponse{}
+	if err := decoder.Decode(result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func decodeToMessageContentResponse(res *http.Response) (*MessageContentResponse, error) {

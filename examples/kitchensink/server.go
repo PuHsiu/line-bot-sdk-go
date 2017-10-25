@@ -15,6 +15,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -44,6 +45,8 @@ func main() {
 	http.HandleFunc("/downloaded/", http.StripPrefix("/downloaded/", downloadedFileServer).ServeHTTP)
 
 	http.HandleFunc("/callback", app.Callback)
+	// This is just a sample code.
+	// For actually use, you must support HTTPS by using `ListenAndServeTLS`, reverse proxy or etc.
 	if err := http.ListenAndServe(":"+os.Getenv("PORT"), nil); err != nil {
 		log.Fatal(err)
 	}
@@ -95,8 +98,8 @@ func (app *KitchenSink) Callback(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	log.Printf("Got events %v", events)
 	for _, event := range events {
+		log.Printf("Got event %v", event)
 		switch event.Type {
 		case linebot.EventTypeMessage:
 			switch message := event.Message.(type) {
@@ -138,9 +141,13 @@ func (app *KitchenSink) Callback(w http.ResponseWriter, r *http.Request) {
 				log.Print(err)
 			}
 		case linebot.EventTypeLeave:
-			log.Printf("Leaved: %v", event)
+			log.Printf("Left: %v", event)
 		case linebot.EventTypePostback:
-			if err := app.replyText(event.ReplyToken, "Got postback: "+event.Postback.Data); err != nil {
+			data := event.Postback.Data
+			if data == "DATE" || data == "TIME" || data == "DATETIME" {
+				data += fmt.Sprintf("(%v)", *event.Postback.Params)
+			}
+			if err := app.replyText(event.ReplyToken, "Got postback: "+data); err != nil {
 				log.Print(err)
 			}
 		case linebot.EventTypeBeacon:
@@ -215,6 +222,45 @@ func (app *KitchenSink) handleText(message *linebot.TextMessage, replyToken stri
 		if _, err := app.bot.ReplyMessage(
 			replyToken,
 			linebot.NewTemplateMessage("Carousel alt text", template),
+		).Do(); err != nil {
+			return err
+		}
+	case "image carousel":
+		imageURL := app.appBaseURL + "/static/buttons/1040.jpg"
+		template := linebot.NewImageCarouselTemplate(
+			linebot.NewImageCarouselColumn(
+				imageURL,
+				linebot.NewURITemplateAction("Go to LINE", "https://line.me"),
+			),
+			linebot.NewImageCarouselColumn(
+				imageURL,
+				linebot.NewPostbackTemplateAction("Say hello1", "hello こんにちは", ""),
+			),
+			linebot.NewImageCarouselColumn(
+				imageURL,
+				linebot.NewMessageTemplateAction("Say message", "Rice=米"),
+			),
+			linebot.NewImageCarouselColumn(
+				imageURL,
+				linebot.NewDatetimePickerTemplateAction("datetime", "DATETIME", "datetime", "", "", ""),
+			),
+		)
+		if _, err := app.bot.ReplyMessage(
+			replyToken,
+			linebot.NewTemplateMessage("Image carousel alt text", template),
+		).Do(); err != nil {
+			return err
+		}
+	case "datetime":
+		template := linebot.NewButtonsTemplate(
+			"", "", "Select date / time !",
+			linebot.NewDatetimePickerTemplateAction("date", "DATE", "date", "", "", ""),
+			linebot.NewDatetimePickerTemplateAction("time", "TIME", "time", "", "", ""),
+			linebot.NewDatetimePickerTemplateAction("datetime", "DATETIME", "datetime", "", "", ""),
+		)
+		if _, err := app.bot.ReplyMessage(
+			replyToken,
+			linebot.NewTemplateMessage("Datetime pickers alt text", template),
 		).Do(); err != nil {
 			return err
 		}
