@@ -15,14 +15,13 @@
 package linebot
 
 import (
+	"context"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
 )
 
 func TestPushMessages(t *testing.T) {
@@ -33,14 +32,14 @@ func TestPushMessages(t *testing.T) {
 		Error       error
 	}
 	var testCases = []struct {
-		Messages     []Message
+		Messages     []SendingMessage
 		Response     []byte
 		ResponseCode int
 		Want         want
 	}{
 		{
 			// A text message
-			Messages:     []Message{NewTextMessage("Hello, world")},
+			Messages:     []SendingMessage{NewTextMessage("Hello, world")},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
@@ -50,7 +49,7 @@ func TestPushMessages(t *testing.T) {
 		},
 		{
 			// A image message
-			Messages:     []Message{NewImageMessage("http://example.com/original.jpg", "http://example.com/preview.jpg")},
+			Messages:     []SendingMessage{NewImageMessage("http://example.com/original.jpg", "http://example.com/preview.jpg")},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
@@ -60,7 +59,7 @@ func TestPushMessages(t *testing.T) {
 		},
 		{
 			// A video message
-			Messages:     []Message{NewVideoMessage("http://example.com/original.mp4", "http://example.com/preview.jpg")},
+			Messages:     []SendingMessage{NewVideoMessage("http://example.com/original.mp4", "http://example.com/preview.jpg")},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
@@ -70,7 +69,7 @@ func TestPushMessages(t *testing.T) {
 		},
 		{
 			// A audio message
-			Messages:     []Message{NewAudioMessage("http://example.com/original.m4a", 1000)},
+			Messages:     []SendingMessage{NewAudioMessage("http://example.com/original.m4a", 1000)},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
@@ -80,7 +79,7 @@ func TestPushMessages(t *testing.T) {
 		},
 		{
 			// A location message
-			Messages:     []Message{NewLocationMessage("title", "address", 35.65910807942215, 139.70372892916203)},
+			Messages:     []SendingMessage{NewLocationMessage("title", "address", 35.65910807942215, 139.70372892916203)},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
@@ -90,7 +89,7 @@ func TestPushMessages(t *testing.T) {
 		},
 		{
 			// A sticker message
-			Messages:     []Message{NewStickerMessage("1", "1")},
+			Messages:     []SendingMessage{NewStickerMessage("1", "1")},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
@@ -100,38 +99,38 @@ func TestPushMessages(t *testing.T) {
 		},
 		{
 			// A buttons template message
-			Messages: []Message{
+			Messages: []SendingMessage{
 				NewTemplateMessage(
 					"this is a buttons template",
 					NewButtonsTemplate(
 						"https://example.com/bot/images/image.jpg",
 						"Menu",
 						"Please select",
-						NewPostbackTemplateAction("Buy", "action=buy&itemid=123", ""),
-						NewPostbackTemplateAction("Buy", "action=buy&itemid=123", "text"),
-						NewURITemplateAction("View detail", "http://example.com/page/123"),
+						NewPostbackAction("Buy", "action=buy&itemid=123", "", "displayText"),
+						NewPostbackAction("Buy", "action=buy&itemid=123", "text", ""),
+						NewURIAction("View detail", "http://example.com/page/123"),
 					),
 				),
 			},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
-				RequestBody: []byte(`{"to":"U0cc15697597f61dd8b01cea8b027050e","messages":[{"type":"template","altText":"this is a buttons template","template":{"type":"buttons","thumbnailImageUrl":"https://example.com/bot/images/image.jpg","title":"Menu","text":"Please select","actions":[{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123"},{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123","text":"text"},{"type":"uri","label":"View detail","uri":"http://example.com/page/123"}]}}]}` + "\n"),
+				RequestBody: []byte(`{"to":"U0cc15697597f61dd8b01cea8b027050e","messages":[{"type":"template","altText":"this is a buttons template","template":{"type":"buttons","thumbnailImageUrl":"https://example.com/bot/images/image.jpg","title":"Menu","text":"Please select","actions":[{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123","displayText":"displayText"},{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123","text":"text"},{"type":"uri","label":"View detail","uri":"http://example.com/page/123"}]}}]}` + "\n"),
 				Response:    &BasicResponse{},
 			},
 		},
 		{
 			// A buttons template message with datetimepicker action
-			Messages: []Message{
+			Messages: []SendingMessage{
 				NewTemplateMessage(
 					"this is a buttons template",
 					NewButtonsTemplate(
 						"https://example.com/bot/images/image.jpg",
 						"Menu",
 						"Please select a date, time or datetime",
-						NewDatetimePickerTemplateAction("Date", "action=sel&only=date", "date", "2017-09-01", "2017-09-03", ""),
-						NewDatetimePickerTemplateAction("Time", "action=sel&only=time", "time", "", "23:59", "00:00"),
-						NewDatetimePickerTemplateAction("DateTime", "action=sel", "datetime", "2017-09-01T12:00", "", ""),
+						NewDatetimePickerAction("Date", "action=sel&only=date", "date", "2017-09-01", "2017-09-03", ""),
+						NewDatetimePickerAction("Time", "action=sel&only=time", "time", "", "23:59", "00:00"),
+						NewDatetimePickerAction("DateTime", "action=sel", "datetime", "2017-09-01T12:00", "", ""),
 					),
 				),
 			},
@@ -144,79 +143,101 @@ func TestPushMessages(t *testing.T) {
 		},
 		{
 			// A buttons template message without thumbnailImageURL
-			Messages: []Message{
+			Messages: []SendingMessage{
 				NewTemplateMessage(
 					"this is a buttons template",
 					NewButtonsTemplate(
 						"",
 						"Menu",
 						"Please select",
-						NewPostbackTemplateAction("Buy", "action=buy&itemid=123", ""),
-						NewPostbackTemplateAction("Buy", "action=buy&itemid=123", "text"),
-						NewURITemplateAction("View detail", "http://example.com/page/123"),
+						NewPostbackAction("Buy", "action=buy&itemid=123", "", "displayText"),
+						NewPostbackAction("Buy", "action=buy&itemid=123", "text", ""),
+						NewURIAction("View detail", "http://example.com/page/123"),
 					),
 				),
 			},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
-				RequestBody: []byte(`{"to":"U0cc15697597f61dd8b01cea8b027050e","messages":[{"type":"template","altText":"this is a buttons template","template":{"type":"buttons","title":"Menu","text":"Please select","actions":[{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123"},{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123","text":"text"},{"type":"uri","label":"View detail","uri":"http://example.com/page/123"}]}}]}` + "\n"),
+				RequestBody: []byte(`{"to":"U0cc15697597f61dd8b01cea8b027050e","messages":[{"type":"template","altText":"this is a buttons template","template":{"type":"buttons","title":"Menu","text":"Please select","actions":[{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123","displayText":"displayText"},{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123","text":"text"},{"type":"uri","label":"View detail","uri":"http://example.com/page/123"}]}}]}` + "\n"),
 				Response:    &BasicResponse{},
 			},
 		},
 		{
 			// A buttons template message without title
-			Messages: []Message{
+			Messages: []SendingMessage{
 				NewTemplateMessage(
 					"this is a buttons template",
 					NewButtonsTemplate(
 						"https://example.com/bot/images/image.jpg",
 						"",
 						"Please select",
-						NewPostbackTemplateAction("Buy", "action=buy&itemid=123", ""),
-						NewPostbackTemplateAction("Buy", "action=buy&itemid=123", "text"),
-						NewURITemplateAction("View detail", "http://example.com/page/123"),
+						NewPostbackAction("Buy", "action=buy&itemid=123", "", "displayText"),
+						NewPostbackAction("Buy", "action=buy&itemid=123", "text", ""),
+						NewURIAction("View detail", "http://example.com/page/123"),
 					),
 				),
 			},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
-				RequestBody: []byte(`{"to":"U0cc15697597f61dd8b01cea8b027050e","messages":[{"type":"template","altText":"this is a buttons template","template":{"type":"buttons","thumbnailImageUrl":"https://example.com/bot/images/image.jpg","text":"Please select","actions":[{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123"},{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123","text":"text"},{"type":"uri","label":"View detail","uri":"http://example.com/page/123"}]}}]}` + "\n"),
+				RequestBody: []byte(`{"to":"U0cc15697597f61dd8b01cea8b027050e","messages":[{"type":"template","altText":"this is a buttons template","template":{"type":"buttons","thumbnailImageUrl":"https://example.com/bot/images/image.jpg","text":"Please select","actions":[{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123","displayText":"displayText"},{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123","text":"text"},{"type":"uri","label":"View detail","uri":"http://example.com/page/123"}]}}]}` + "\n"),
+				Response:    &BasicResponse{},
+			},
+		},
+		{
+			// A buttons template message without title, with image options
+			Messages: []SendingMessage{
+				NewTemplateMessage(
+					"this is a buttons template",
+					NewButtonsTemplate(
+						"https://example.com/bot/images/image.jpg",
+						"",
+						"Please select",
+						NewPostbackAction("Buy", "action=buy&itemid=123", "", "displayText"),
+						NewPostbackAction("Buy", "action=buy&itemid=123", "text", ""),
+						NewURIAction("View detail", "http://example.com/page/123"),
+					).WithImageOptions("rectangle", "cover", "#FFFFFF"),
+				),
+			},
+			ResponseCode: 200,
+			Response:     []byte(`{}`),
+			Want: want{
+				RequestBody: []byte(`{"to":"U0cc15697597f61dd8b01cea8b027050e","messages":[{"type":"template","altText":"this is a buttons template","template":{"type":"buttons","thumbnailImageUrl":"https://example.com/bot/images/image.jpg","imageAspectRatio":"rectangle","imageSize":"cover","imageBackgroundColor":"#FFFFFF","text":"Please select","actions":[{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123","displayText":"displayText"},{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123","text":"text"},{"type":"uri","label":"View detail","uri":"http://example.com/page/123"}]}}]}` + "\n"),
 				Response:    &BasicResponse{},
 			},
 		},
 		{
 			// A buttons template message without thumbnailImageURL and title
-			Messages: []Message{
+			Messages: []SendingMessage{
 				NewTemplateMessage(
 					"this is a buttons template",
 					NewButtonsTemplate(
 						"",
 						"",
 						"Please select",
-						NewPostbackTemplateAction("Buy", "action=buy&itemid=123", ""),
-						NewPostbackTemplateAction("Buy", "action=buy&itemid=123", "text"),
-						NewURITemplateAction("View detail", "http://example.com/page/123"),
+						NewPostbackAction("Buy", "action=buy&itemid=123", "", "displayText"),
+						NewPostbackAction("Buy", "action=buy&itemid=123", "text", ""),
+						NewURIAction("View detail", "http://example.com/page/123"),
 					),
 				),
 			},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
-				RequestBody: []byte(`{"to":"U0cc15697597f61dd8b01cea8b027050e","messages":[{"type":"template","altText":"this is a buttons template","template":{"type":"buttons","text":"Please select","actions":[{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123"},{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123","text":"text"},{"type":"uri","label":"View detail","uri":"http://example.com/page/123"}]}}]}` + "\n"),
+				RequestBody: []byte(`{"to":"U0cc15697597f61dd8b01cea8b027050e","messages":[{"type":"template","altText":"this is a buttons template","template":{"type":"buttons","text":"Please select","actions":[{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123","displayText":"displayText"},{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=123","text":"text"},{"type":"uri","label":"View detail","uri":"http://example.com/page/123"}]}}]}` + "\n"),
 				Response:    &BasicResponse{},
 			},
 		},
 		{
 			// A confirm template message
-			Messages: []Message{
+			Messages: []SendingMessage{
 				NewTemplateMessage(
 					"this is a confirm template",
 					NewConfirmTemplate(
 						"Are you sure?",
-						NewMessageTemplateAction("Yes", "yes"),
-						NewMessageTemplateAction("No", "no"),
+						NewMessageAction("Yes", "yes"),
+						NewMessageAction("No", "no"),
 					),
 				),
 			},
@@ -229,7 +250,7 @@ func TestPushMessages(t *testing.T) {
 		},
 		{
 			// A carousel template message
-			Messages: []Message{
+			Messages: []SendingMessage{
 				NewTemplateMessage(
 					"this is a carousel template",
 					NewCarouselTemplate(
@@ -237,9 +258,9 @@ func TestPushMessages(t *testing.T) {
 							"https://example.com/bot/images/item1.jpg",
 							"this is menu",
 							"description",
-							NewPostbackTemplateAction("Buy", "action=buy&itemid=111", ""),
-							NewPostbackTemplateAction("Add to cart", "action=add&itemid=111", ""),
-							NewURITemplateAction("View detail", "http://example.com/page/111"),
+							NewPostbackAction("Buy", "action=buy&itemid=111", "", ""),
+							NewPostbackAction("Add to cart", "action=add&itemid=111", "", ""),
+							NewURIAction("View detail", "http://example.com/page/111"),
 						),
 					),
 				),
@@ -252,14 +273,38 @@ func TestPushMessages(t *testing.T) {
 			},
 		},
 		{
+			// A carousel template message, with new image options
+			Messages: []SendingMessage{
+				NewTemplateMessage(
+					"this is a carousel template with imageAspectRatio, imageSize and imageBackgroundColor",
+					NewCarouselTemplate(
+						NewCarouselColumn(
+							"https://example.com/bot/images/item1.jpg",
+							"this is menu",
+							"description",
+							NewPostbackAction("Buy", "action=buy&itemid=111", "", ""),
+							NewPostbackAction("Add to cart", "action=add&itemid=111", "", ""),
+							NewURIAction("View detail", "http://example.com/page/111"),
+						).WithImageOptions("#FFFFFF"),
+					).WithImageOptions("rectangle", "cover"),
+				),
+			},
+			ResponseCode: 200,
+			Response:     []byte(`{}`),
+			Want: want{
+				RequestBody: []byte(`{"to":"U0cc15697597f61dd8b01cea8b027050e","messages":[{"type":"template","altText":"this is a carousel template with imageAspectRatio, imageSize and imageBackgroundColor","template":{"type":"carousel","columns":[{"thumbnailImageUrl":"https://example.com/bot/images/item1.jpg","imageBackgroundColor":"#FFFFFF","title":"this is menu","text":"description","actions":[{"type":"postback","label":"Buy","data":"action=buy\u0026itemid=111"},{"type":"postback","label":"Add to cart","data":"action=add\u0026itemid=111"},{"type":"uri","label":"View detail","uri":"http://example.com/page/111"}]}],"imageAspectRatio":"rectangle","imageSize":"cover"}}]}` + "\n"),
+				Response:    &BasicResponse{},
+			},
+		},
+		{
 			// A imagecarousel template message
-			Messages: []Message{
+			Messages: []SendingMessage{
 				NewTemplateMessage(
 					"this is a image carousel template",
 					NewImageCarouselTemplate(
 						NewImageCarouselColumn(
 							"https://example.com/bot/images/item1.jpg",
-							NewURITemplateAction("View detail", "http://example.com/page/111"),
+							NewURIAction("View detail", "http://example.com/page/111"),
 						),
 					),
 				),
@@ -273,7 +318,7 @@ func TestPushMessages(t *testing.T) {
 		},
 		{
 			// A imagemap message
-			Messages: []Message{
+			Messages: []SendingMessage{
 				NewImagemapMessage(
 					"https://example.com/bot/images/rm001",
 					"this is an imagemap",
@@ -290,8 +335,59 @@ func TestPushMessages(t *testing.T) {
 			},
 		},
 		{
+			// A flex message
+			Messages: []SendingMessage{
+				NewFlexMessage(
+					"this is a flex message",
+					&BubbleContainer{
+						Type: FlexContainerTypeBubble,
+						Body: &BoxComponent{
+							Type:   FlexComponentTypeBox,
+							Layout: FlexBoxLayoutTypeVertical,
+							Contents: []FlexComponent{
+								&TextComponent{
+									Type: FlexComponentTypeText,
+									Text: "hello",
+								},
+								&TextComponent{
+									Type: FlexComponentTypeText,
+									Text: "world",
+								},
+							},
+						},
+					},
+				),
+			},
+			ResponseCode: 200,
+			Response:     []byte(`{}`),
+			Want: want{
+				RequestBody: []byte(`{"to":"U0cc15697597f61dd8b01cea8b027050e","messages":[{"type":"flex","altText":"this is a flex message","contents":{"type":"bubble","body":{"type":"box","layout":"vertical","contents":[{"type":"text","text":"hello"},{"type":"text","text":"world"}]}}}]}` + "\n"),
+				Response:    &BasicResponse{},
+			},
+		},
+		{
+			// A text message with quick replies
+			Messages: []SendingMessage{
+				NewTextMessage(
+					"Select your favorite food category or send me your location!",
+				).WithQuickReplies(
+					NewQuickReplyItems(
+						NewQuickReplyButton("https://example.com/sushi.png", NewMessageAction("Sushi", "Sushi")),
+						NewQuickReplyButton("https://example.com/tempura.png", NewMessageAction("Tempura", "Tempura")),
+						NewQuickReplyButton("", NewLocationAction("Send location")),
+					),
+				),
+			},
+			ResponseCode: 200,
+			Response:     []byte(`{}`),
+			Want: want{
+				RequestBody: []byte(`{"to":"U0cc15697597f61dd8b01cea8b027050e","messages":[{"type":"text","text":"Select your favorite food category or send me your location!","quickReply":{"items":[{"type":"action","imageUrl":"https://example.com/sushi.png","action":{"type":"message","label":"Sushi","text":"Sushi"}},{"type":"action","imageUrl":"https://example.com/tempura.png","action":{"type":"message","label":"Tempura","text":"Tempura"}},{"type":"action","action":{"type":"location","label":"Send location"}}]}}]}` + "\n"),
+				Response:    &BasicResponse{},
+			},
+		},
+		{
 			// Multiple messages
-			Messages:     []Message{NewTextMessage("Hello, world1"), NewTextMessage("Hello, world2")},
+			Messages:     []SendingMessage{NewTextMessage("Hello, world1"), NewTextMessage("Hello, world2")},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
@@ -301,7 +397,7 @@ func TestPushMessages(t *testing.T) {
 		},
 		{
 			// Bad request
-			Messages:     []Message{NewTextMessage(""), NewTextMessage("")},
+			Messages:     []SendingMessage{NewTextMessage(""), NewTextMessage("")},
 			ResponseCode: 400,
 			Response:     []byte(`{"message":"Request body has 2 error(s).","details":[{"message":"may not be empty","property":"messages[0].text"},{"message":"may not be empty","property":"messages[1].text"}]}`),
 			Want: want{
@@ -398,14 +494,14 @@ func TestReplyMessages(t *testing.T) {
 		Error       error
 	}
 	var testCases = []struct {
-		Messages     []Message
+		Messages     []SendingMessage
 		Response     []byte
 		ResponseCode int
 		Want         want
 	}{
 		{
 			// A text message
-			Messages:     []Message{NewTextMessage("Hello, world")},
+			Messages:     []SendingMessage{NewTextMessage("Hello, world")},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
@@ -415,7 +511,7 @@ func TestReplyMessages(t *testing.T) {
 		},
 		{
 			// A location message
-			Messages:     []Message{NewLocationMessage("title", "address", 35.65910807942215, 139.70372892916203)},
+			Messages:     []SendingMessage{NewLocationMessage("title", "address", 35.65910807942215, 139.70372892916203)},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
@@ -425,7 +521,7 @@ func TestReplyMessages(t *testing.T) {
 		},
 		{
 			// A image message
-			Messages:     []Message{NewImageMessage("http://example.com/original.jpg", "http://example.com/preview.jpg")},
+			Messages:     []SendingMessage{NewImageMessage("http://example.com/original.jpg", "http://example.com/preview.jpg")},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
@@ -435,7 +531,7 @@ func TestReplyMessages(t *testing.T) {
 		},
 		{
 			// A sticker message
-			Messages:     []Message{NewStickerMessage("1", "1")},
+			Messages:     []SendingMessage{NewStickerMessage("1", "1")},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
@@ -445,7 +541,7 @@ func TestReplyMessages(t *testing.T) {
 		},
 		{
 			// Bad request
-			Messages:     []Message{NewTextMessage(""), NewTextMessage("")},
+			Messages:     []SendingMessage{NewTextMessage(""), NewTextMessage("")},
 			ResponseCode: 400,
 			Response:     []byte(`{"message":"Request body has 2 error(s).","details":[{"message":"may not be empty","property":"messages[0].text"},{"message":"may not be empty","property":"messages[1].text"}]}`),
 			Want: want{
@@ -545,14 +641,14 @@ func TestMulticastMessages(t *testing.T) {
 		Error       error
 	}
 	var testCases = []struct {
-		Messages     []Message
+		Messages     []SendingMessage
 		Response     []byte
 		ResponseCode int
 		Want         want
 	}{
 		{
 			// A text message
-			Messages:     []Message{NewTextMessage("Hello, world")},
+			Messages:     []SendingMessage{NewTextMessage("Hello, world")},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
@@ -562,7 +658,7 @@ func TestMulticastMessages(t *testing.T) {
 		},
 		{
 			// A location message
-			Messages:     []Message{NewLocationMessage("title", "address", 35.65910807942215, 139.70372892916203)},
+			Messages:     []SendingMessage{NewLocationMessage("title", "address", 35.65910807942215, 139.70372892916203)},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
@@ -572,7 +668,7 @@ func TestMulticastMessages(t *testing.T) {
 		},
 		{
 			// A image message
-			Messages:     []Message{NewImageMessage("http://example.com/original.jpg", "http://example.com/preview.jpg")},
+			Messages:     []SendingMessage{NewImageMessage("http://example.com/original.jpg", "http://example.com/preview.jpg")},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
@@ -582,7 +678,7 @@ func TestMulticastMessages(t *testing.T) {
 		},
 		{
 			// A sticker message
-			Messages:     []Message{NewStickerMessage("1", "1")},
+			Messages:     []SendingMessage{NewStickerMessage("1", "1")},
 			ResponseCode: 200,
 			Response:     []byte(`{}`),
 			Want: want{
@@ -592,7 +688,7 @@ func TestMulticastMessages(t *testing.T) {
 		},
 		{
 			// Bad request
-			Messages:     []Message{NewTextMessage(""), NewTextMessage("")},
+			Messages:     []SendingMessage{NewTextMessage(""), NewTextMessage("")},
 			ResponseCode: 400,
 			Response:     []byte(`{"message":"Request body has 2 error(s).","details":[{"message":"may not be empty","property":"messages[0].text"},{"message":"may not be empty","property":"messages[1].text"}]}`),
 			Want: want{
