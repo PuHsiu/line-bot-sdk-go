@@ -15,6 +15,7 @@
 package linebot
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -23,8 +24,6 @@ import (
 	"reflect"
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
 )
 
 func TestGetGroupMemberIDs(t *testing.T) {
@@ -170,7 +169,7 @@ func BenchmarkGetGroupMemberIDs(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err = client.GetGroupMemberIDs("cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxx").Do()
+		client.GetGroupMemberIDs("cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxx").Do()
 	}
 }
 
@@ -317,7 +316,7 @@ func BenchmarkGetRoomMemberIDs(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err = client.GetRoomMemberIDs("cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxx").Do()
+		client.GetRoomMemberIDs("cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxx").Do()
 	}
 }
 
